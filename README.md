@@ -1,4 +1,4 @@
-## AIO2 BPR Baseline
+# AIO3 BPR Baseline
 
 This is a baseline system for AIO3 competition utilizing [Binary Passage Retriever (BPR)](https://github.com/studio-ousia/bpr).
 
@@ -35,7 +35,7 @@ $ pip install -e soseki
 
 ## Example Usage
 
-Before you start, you need to download the　AIO3 datasets into `<DATA_DIR>`.
+Before you start, you need to download the AIO3 datasets into `<DATA_DIR>`.
 
 We used 4 GPUs with 12GB memory each for the experiments.
 
