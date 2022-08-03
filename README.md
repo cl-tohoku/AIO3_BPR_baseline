@@ -12,9 +12,9 @@ This work utilizes the implementation of BPR in [studio-ousia/soseki](https://gi
 
 ```sh
 # Clone the repository with soseki submodule.
-$ git clone --recursive https://github.com/cl-tohoku/aio3-bpr-baseline
+$ git clone --recursive https://github.com/cl-tohoku/AIO3_BPR_baseline
 
-$ cd aio3-bpr-baseline
+$ cd AIO3_BPR_baseline
 
 # Upgrade pip and setuptools.
 $ pip install -U pip setuptools
@@ -28,33 +28,34 @@ $ pip install 'torch==1.11.0'
 $ pip install -r soseki/requirements.txt
 
 # Install the soseki package.
-$ pip install soseki
-# Or if you want to install it in editable mode:
-$ pip install -e soseki
+$ pip install ./soseki
 ```
 
 ## Example Usage
 
-Before you start, you need to download the AIO3 datasets into `<DATA_DIR>`.
+Before you start, you need to download the AIO3 datasets into `$DATA_DIR`.
 
 We used 4 GPUs with 12GB memory each for the experiments.
 
 **1. Build passage database**
 
 ```sh
-$ python build_passage_db.py \
-    --passage_file <DATA_DIR>/wikipedia-split/jawiki-20220404-c400-large.tsv.gz \
-    --db_file <WORK_DIR>/passages.db \
+$ python soseki/build_passage_db.py \
+    --passage_file $DATA_DIR/wikipedia-split/jawiki-20220404-c400-large.tsv.gz \
+    --db_file $WORK_DIR/passages.db \
     --db_map_size 10000000000
 ```
 
 **2. Train a biencoder**
 
 ```sh
-$ python train_biencoder.py \
-    --train_file <DATA_DIR>/retriever/abc_01-12.json.gz <DATA_DIR>/retriever/aio_01_dev.json.gz <DATA_DIR>/retriever/aio_01_test.json.gz <DATA_DIR>/retriever/aio_01_unused.json.gz \
-    --val_file <DATA_DIR>/retriever/aio_02_dev.json.gz \
-    --output_dir <WORK_DIR>/biencoder \
+$ python soseki/train_biencoder.py \
+    --train_file $DATA_DIR/retriever/jawiki-20220404-c400-large/abc_01-12.json.gz \
+                 $DATA_DIR/retriever/jawiki-20220404-c400-large/aio_01_dev.json.gz \
+                 $DATA_DIR/retriever/jawiki-20220404-c400-large/aio_01_test.json.gz \
+                 $DATA_DIR/retriever/jawiki-20220404-c400-large/aio_01_unused.json.gz \
+    --val_file $DATA_DIR/retriever/jawiki-20220404-c400-large/aio_02_dev.json.gz \
+    --output_dir $WORK_DIR/biencoder \
     --max_question_length 128 \
     --max_passage_length 256 \
     --num_negative_passages 1 \
@@ -76,10 +77,10 @@ $ python train_biencoder.py \
 **3. Build passage embeddings**
 
 ```sh
-$ python build_passage_embeddings.py \
-    --biencoder_file <WORK_DIR>/biencoder/lightning_logs/version_0/checkpoints/last.ckpt \
-    --passage_db_file <WORK_DIR>/passages.db \
-    --output_file <WORK_DIR>/passage_embeddings.idx \
+$ python soseki/build_passage_embeddings.py \
+    --biencoder_file $WORK_DIR/biencoder/lightning_logs/version_0/checkpoints/last.ckpt \
+    --passage_db_file $WORK_DIR/passages.db \
+    --output_file $WORK_DIR/passage_embeddings.idx \
     --max_passage_length 256 \
     --batch_size 2048 \
     --device_ids 0 1 2 3
@@ -88,20 +89,23 @@ $ python build_passage_embeddings.py \
 **4. Evaluate the retriever and create datasets for reader**
 
 ```sh
-$ mkdir <WORK_DIR>/reader_data
+$ mkdir $WORK_DIR/reader_data
 
-$ python evaluate_retriever.py \
-    --biencoder_file <WORK_DIR>/biencoder/lightning_logs/version_0/checkpoints/last.ckpt \
-    --passage_db_file <WORK_DIR>/passages.db \
-    --passage_embeddings_file <WORK_DIR>/passage_embeddings.idx \
-    --qa_file <DATA_DIR>/qas/abc_01-12.tsv <DATA_DIR>/qas/aio_01_dev.tsv <DATA_DIR>/qas/aio_01_test.tsv <DATA_DIR>/qas/aio_01_unused.tsv \
-    --output_file <WORK_DIR>/reader_data/abc_01-12_aio_01.jsonl \
+$ python soseki/evaluate_retriever.py \
+    --biencoder_file $WORK_DIR/biencoder/lightning_logs/version_0/checkpoints/last.ckpt \
+    --passage_db_file $WORK_DIR/passages.db \
+    --passage_embeddings_file $WORK_DIR/passage_embeddings.idx \
+    --qa_file $DATA_DIR/qas/abc_01-12.tsv \
+              $DATA_DIR/qas/aio_01_dev.tsv \
+              $DATA_DIR/qas/aio_01_test.tsv \
+              $DATA_DIR/qas/aio_01_unused.tsv \
+    --output_file $WORK_DIR/reader_data/abc_01-12_aio_01.jsonl \
     --batch_size 64 \
-    --max_question_length 64 \
+    --max_question_length 128 \
     --top_k 1 2 5 10 20 50 100 \
     --binary \
     --binary_k 2048 \
-    --answer_match_type dpr_string \
+    --answer_match_type simple_nfkc \
     --include_title_in_passage \
     --device_ids 0 1 2 3
 # The result should be logged as follows:
@@ -113,18 +117,18 @@ $ python evaluate_retriever.py \
 # Recall at 50: 0.9181 (20505/22335)
 # Recall at 100: 0.9281 (20729/22335)
 
-$ python evaluate_retriever.py \
-    --biencoder_file <WORK_DIR>/biencoder/lightning_logs/version_0/checkpoints/last.ckpt \
-    --passage_db_file <WORK_DIR>/passages.db \
-    --passage_embeddings_file <WORK_DIR>/passage_embeddings.idx \
-    --qa_file <DATA_DIR>/qas/aio_02_dev.tsv \
-    --output_file <WORK_DIR>/reader_data/aio_02_dev.jsonl \
+$ python soseki/evaluate_retriever.py \
+    --biencoder_file $WORK_DIR/biencoder/lightning_logs/version_0/checkpoints/last.ckpt \
+    --passage_db_file $WORK_DIR/passages.db \
+    --passage_embeddings_file $WORK_DIR/passage_embeddings.idx \
+    --qa_file $DATA_DIR/qas/aio_02_dev.tsv \
+    --output_file $WORK_DIR/reader_data/aio_02_dev.jsonl \
     --batch_size 64 \
-    --max_question_length 64 \
+    --max_question_length 128 \
     --top_k 1 2 5 10 20 50 100 \
     --binary \
     --binary_k 2048 \
-    --answer_match_type dpr_string \
+    --answer_match_type simple_nfkc \
     --include_title_in_passage \
     --device_ids 0 1 2 3
 # The result should be logged as follows:
@@ -140,10 +144,10 @@ $ python evaluate_retriever.py \
 **5. Train a reader**
 
 ```sh
-$ python train_reader.py \
-    --train_file <WORK_DIR>/reader_data/abc_01-12_aio_01.jsonl \
-    --val_file <WORK_DIR>/reader_data/aio_02_dev.jsonl \
-    --output_dir <WORK_DIR>/reader \
+$ python soseki/train_reader.py \
+    --train_file $WORK_DIR/reader_data/abc_01-12_aio_01.jsonl \
+    --val_file $WORK_DIR/reader_data/aio_02_dev.jsonl \
+    --output_dir $WORK_DIR/reader \
     --train_num_passages 16 \
     --eval_num_passages 50 \
     --max_input_length 384 \
@@ -167,9 +171,9 @@ $ python train_reader.py \
 **6. Evaluate the reader**
 
 ```sh
-$ python evaluate_reader.py \
-    --reader_file <WORK_DIR>/reader/lightning_logs/version_0/checkpoints/best.ckpt \
-    --test_file <WORK_DIR>/reader_data/aio_02_dev.jsonl \
+$ python soseki/evaluate_reader.py \
+    --reader_file $WORK_DIR/reader/lightning_logs/version_0/checkpoints/best.ckpt \
+    --test_file $WORK_DIR/reader_data/aio_02_dev.jsonl \
     --test_num_passages 100 \
     --test_max_load_passages 100 \
     --test_batch_size 4 \
@@ -187,30 +191,30 @@ $ python evaluate_reader.py \
 **7. (optional) Convert the trained models into ONNX format**
 
 ```sh
-$ python convert_models_to_onnx.py \
-    --biencoder_ckpt_file <WORK_DIR>/biencoder/lightning_logs/version_0/checkpoints/last.ckpt \
-    --reader_ckpt_file <WORK_DIR>/reader/lightning_logs/version_0/checkpoints/best.ckpt \
-    --output_dir <WORK_DIR>/onnx
+$ python soseki/convert_models_to_onnx.py \
+    --biencoder_ckpt_file $WORK_DIR/biencoder/lightning_logs/version_0/checkpoints/last.ckpt \
+    --reader_ckpt_file $WORK_DIR/reader/lightning_logs/version_0/checkpoints/best.ckpt \
+    --output_dir $WORK_DIR/onnx
 ```
 
 **8. Run demo**
 
 ```sh
-$ streamlit run demo.py --browser.serverAddress localhost --browser.serverPort 8501 -- \
-    --biencoder_ckpt_file <WORK_DIR>/biencoder/lightning_logs/version_0/checkpoints/last.ckpt \
-    --reader_ckpt_file <WORK_DIR>/reader/lightning_logs/version_0/checkpoints/best.ckpt \
-    --passage_db_file <WORK_DIR>/passages.db \
-    --passage_embeddings_file <WORK_DIR>/passage_embeddings.idx \
+$ streamlit run soseki/demo.py --browser.serverAddress localhost --browser.serverPort 8501 -- \
+    --biencoder_ckpt_file $WORK_DIR/biencoder/lightning_logs/version_0/checkpoints/last.ckpt \
+    --reader_ckpt_file $WORK_DIR/reader/lightning_logs/version_0/checkpoints/best.ckpt \
+    --passage_db_file $WORK_DIR/passages.db \
+    --passage_embeddings_file $WORK_DIR/passage_embeddings.idx \
     --device cuda:0
 ```
 
 or if you have exported the models to ONNX format:
 
 ```sh
-$ streamlit run demo.py --browser.serverAddress localhost --browser.serverPort 8501 -- \
-    --onnx_model_dir <WORK_DIR>/onnx \
-    --passage_db_file <WORK_DIR>/passages.db \
-    --passage_embeddings_file <WORK_DIR>/passage_embeddings.idx
+$ streamlit run soseki/demo.py --browser.serverAddress localhost --browser.serverPort 8501 -- \
+    --onnx_model_dir $WORK_DIR/onnx \
+    --passage_db_file $WORK_DIR/passages.db \
+    --passage_embeddings_file $WORK_DIR/passage_embeddings.idx
 ```
 
 Then open http://localhost:8501.
@@ -218,8 +222,9 @@ Then open http://localhost:8501.
 The demo can also be launched with Docker:
 
 ```sh
-$ docker build -t soseki --build-arg TRANSFORMERS_BASE_MODEL_NAME='bert-base-uncased' .
-$ docker run --rm -v $(realpath <WORK_DIR>):/app/model -p 8501:8501 -it soseki \
+$ cd soseki
+$ docker build -t aio-bpr-baseline --build-arg TRANSFORMERS_BASE_MODEL_NAME='cl-tohoku/bert-base-japanese-v2' .
+$ docker run --rm -v $(realpath $WORK_DIR):/app/model -p 8501:8501 -it aio-bpr-baseline \
     streamlit run demo.py --browser.serverAddress localhost --browser.serverPort 8501 -- \
         --onnx_model_dir /app/model/onnx \
         --passage_db_file /app/model/passages.db \
