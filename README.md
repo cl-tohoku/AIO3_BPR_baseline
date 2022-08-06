@@ -28,14 +28,18 @@ $ pip install 'torch==1.11.0'
 $ pip install -r soseki/requirements.txt
 
 # Install the soseki package.
-$ pip install ./soseki
+$ pip install -e ./soseki
 ```
 
 ## Example Usage
 
-Before you start, you need to download the AIO3 datasets into `$DATA_DIR`.
+Before you start, you need to download the datasets into `$DATA_DIR`.
 
-We used 4 GPUs with 12GB memory each for the experiments.
+```sh
+$ bash download_data.sh $DATA_DIR
+```
+
+In the following experiments, we used 4 GPUs with 12GB memory each.
 
 **1. Build passage database**
 
@@ -50,10 +54,7 @@ $ python soseki/build_passage_db.py \
 
 ```sh
 $ python soseki/train_biencoder.py \
-    --train_file $DATA_DIR/retriever/jawiki-20220404-c400-large/abc_01-12.json.gz \
-                 $DATA_DIR/retriever/jawiki-20220404-c400-large/aio_01_dev.json.gz \
-                 $DATA_DIR/retriever/jawiki-20220404-c400-large/aio_01_test.json.gz \
-                 $DATA_DIR/retriever/jawiki-20220404-c400-large/aio_01_unused.json.gz \
+    --train_file $DATA_DIR/retriever/jawiki-20220404-c400-large/aio_02_train.json.gz \
     --val_file $DATA_DIR/retriever/jawiki-20220404-c400-large/aio_02_dev.json.gz \
     --output_dir $WORK_DIR/biencoder \
     --max_question_length 128 \
@@ -95,11 +96,8 @@ $ python soseki/evaluate_retriever.py \
     --biencoder_file $WORK_DIR/biencoder/lightning_logs/version_0/checkpoints/last.ckpt \
     --passage_db_file $WORK_DIR/passages.db \
     --passage_embeddings_file $WORK_DIR/passage_embeddings.idx \
-    --qa_file $DATA_DIR/qas/abc_01-12.tsv \
-              $DATA_DIR/qas/aio_01_dev.tsv \
-              $DATA_DIR/qas/aio_01_test.tsv \
-              $DATA_DIR/qas/aio_01_unused.tsv \
-    --output_file $WORK_DIR/reader_data/abc_01-12_aio_01.jsonl \
+    --qa_file $DATA_DIR/qas/aio_02_train.tsv \
+    --output_file $WORK_DIR/reader_data/aio_02_train.jsonl \
     --batch_size 64 \
     --max_question_length 128 \
     --top_k 1 2 5 10 20 50 100 \
@@ -145,7 +143,7 @@ $ python soseki/evaluate_retriever.py \
 
 ```sh
 $ python soseki/train_reader.py \
-    --train_file $WORK_DIR/reader_data/abc_01-12_aio_01.jsonl \
+    --train_file $WORK_DIR/reader_data/aio_02_train.jsonl \
     --val_file $WORK_DIR/reader_data/aio_02_dev.jsonl \
     --output_dir $WORK_DIR/reader \
     --train_num_passages 16 \
@@ -197,10 +195,12 @@ $ python soseki/convert_models_to_onnx.py \
     --output_dir $WORK_DIR/onnx
 ```
 
-**8. Run demo**
+**8. Perform prediction**
 
 ```sh
-$ streamlit run soseki/demo.py --browser.serverAddress localhost --browser.serverPort 8501 -- \
+$ python predict.py \
+    --input_file $DATA_DIR/test/aio_03_test_unlabeled.jsonl \
+    --output_file $WORK_DIR/aio_03_test_prediction.jsonl \
     --biencoder_ckpt_file $WORK_DIR/biencoder/lightning_logs/version_0/checkpoints/last.ckpt \
     --reader_ckpt_file $WORK_DIR/reader/lightning_logs/version_0/checkpoints/best.ckpt \
     --passage_db_file $WORK_DIR/passages.db \
@@ -211,25 +211,14 @@ $ streamlit run soseki/demo.py --browser.serverAddress localhost --browser.serve
 or if you have exported the models to ONNX format:
 
 ```sh
-$ streamlit run soseki/demo.py --browser.serverAddress localhost --browser.serverPort 8501 -- \
+$ python predict.py \
+    --input_file $DATA_DIR/test/aio_03_test_unlabeled.jsonl \
+    --output_file $WORK_DIR/aio_03_test_prediction.jsonl \
     --onnx_model_dir $WORK_DIR/onnx \
     --passage_db_file $WORK_DIR/passages.db \
     --passage_embeddings_file $WORK_DIR/passage_embeddings.idx
 ```
 
-Then open http://localhost:8501.
-
-The demo can also be launched with Docker:
-
-```sh
-$ cd soseki
-$ docker build -t aio-bpr-baseline --build-arg TRANSFORMERS_BASE_MODEL_NAME='cl-tohoku/bert-base-japanese-v2' .
-$ docker run --rm -v $(realpath $WORK_DIR):/app/model -p 8501:8501 -it aio-bpr-baseline \
-    streamlit run demo.py --browser.serverAddress localhost --browser.serverPort 8501 -- \
-        --onnx_model_dir /app/model/onnx \
-        --passage_db_file /app/model/passages.db \
-        --passage_embeddings_file /app/model/passage_embeddings.idx
-```
 
 ## License
 
