@@ -219,6 +219,57 @@ $ python predict.py \
     --passage_embeddings_file $WORK_DIR/passage_embeddings.idx
 ```
 
+### Subission for AIO3 Competition
+
+**Note:** It is assumed that the trained models are converted into onnx format.
+
+**1. Copy the models and data files into `models/` directory**
+
+The files should be placed and renamed as follows:
+
+```sh
+models
+├── passage_embeddings.idx      # from $WORK_DIR/passage_embeddings.idx
+├── onnx
+│   ├── biencoder_hparams.json  # from $WORK_DIR/onnx/biencoder_hparams.json
+│   ├── question_encoder.onnx   # from $WORK_DIR/onnx/question_encoder.onnx
+│   ├── reader.onnx             # from $WORK_DIR/onnx/reader.onnx
+│   └── reader_hparams.json     # from $WORK_DIR/onnx/reader_hparams.json
+└── passages.tsv.gz             # from $DATA_DIR/wikipedia-split/jawiki-20220404-c400-large.tsv.gz
+```
+
+**Note:** You will not need `$WORK_DIR/onnx/passage_encoder.onnx` since it is not used in the prediction stage.
+
+**2. Build the Docker image**
+
+```sh
+$ docker build -t aio3-bpr-baseline .
+```
+
+You can find the size of the image by executing the command below:
+
+```sh
+$ docker run --rm aio3-bpr-baseline du -h --max-depth=0 /
+```
+
+**3. Run the image to perform prediction**
+
+We assume `$TEST_DATA_DIR` contains a test file such as [`aio_03_test_unlabeled.jsonl`](https://jaqket.s3.ap-northeast-1.amazonaws.com/data/aio_03/aio_03_test_unlabeled.jsonl), which is distributed on the [AIO official website](https://sites.google.com/view/project-aio/competition3).
+
+```sh
+$ docker run --rm -v $(realpath $TEST_DATA_DIR):/app/data -it aio3-bpr-baseline \
+    bash submission.sh data/aio_03_test_unlabeled.jsonl data/predictions.jsonl
+```
+
+The prediction result will be saved to `$TEST_DATA_DIR/predictions.jsonl`.
+
+**4. Save a Docker image to file**
+
+```sh
+$ docker save aio3-bpr-baseline | gzip > aio3-bpr-baseline.tar.gz
+```
+
+The saved Docker image should be about 2.4GB.
 
 ## License
 
